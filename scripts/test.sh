@@ -20,6 +20,14 @@ compile_and_run youtube_preview \
     "$project_dir/Sources/Replay/YouTubePreview.swift" \
     "$project_dir/tools/youtube_preview_check.swift"
 
+compile_and_run download_progress \
+    "$project_dir/Sources/Replay/DownloadProgress.swift" \
+    "$project_dir/tools/download_progress_check.swift"
+
+compile_and_run video_quality \
+    "$project_dir/Sources/Replay/VideoQuality.swift" \
+    "$project_dir/tools/video_quality_check.swift"
+
 compile_and_run retry_policy \
     "$project_dir/Sources/Replay/DownloadRetryPolicy.swift" \
     "$project_dir/tools/retry_policy_check.swift"

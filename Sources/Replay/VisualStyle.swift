@@ -669,3 +669,49 @@ enum ThumbnailImageCache {
         return image
     }
 }
+
+/// Stops AppKit from adding an automatic content inset to the enclosing
+/// scroll view.
+///
+/// The sidebar list sits just below a header that is drawn through the title
+/// bar. On macOS 27 AppKit gives the scroll view behind a SwiftUI
+/// `ScrollView` an automatic top inset for the toolbar (about 47 points).
+/// SwiftUI drew the rows with that inset but hit-tested them without it, so
+/// clicking a row selected the one below. The header already reserves the
+/// title-bar space, so the list needs no inset of its own.
+struct ScrollViewAutomaticInsetDisabler: NSViewRepresentable {
+    func makeNSView(context: Context) -> ProbeView {
+        ProbeView()
+    }
+
+    func updateNSView(_ view: ProbeView, context: Context) {
+        view.apply()
+    }
+
+    final class ProbeView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            DispatchQueue.main.async { [weak self] in self?.apply() }
+        }
+
+        override func layout() {
+            super.layout()
+            apply()
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            nil
+        }
+
+        func apply() {
+            guard let scrollView = enclosingScrollView else { return }
+            if scrollView.automaticallyAdjustsContentInsets {
+                scrollView.automaticallyAdjustsContentInsets = false
+            }
+            let insets = scrollView.contentInsets
+            if insets.top != 0 || insets.left != 0 || insets.bottom != 0 || insets.right != 0 {
+                scrollView.contentInsets = NSEdgeInsetsZero
+            }
+        }
+    }
+}

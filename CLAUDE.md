@@ -18,6 +18,9 @@ macOS 用のオフライン動画キューアプリ Replay のフォーク。利
 ## ビルドとテスト
 - ビルド: `swift build -c release`
 - アプリの生成: `./scripts/build_app.sh` で `dist/Replay.app` を作る（アドホック署名）。yt-dlp・ffmpeg・deno は同梱されず、Homebrew のパス（`/opt/homebrew/bin`、`/usr/local/bin`）を探す。この Mac には Homebrew で入れてある。普段使いはこの開発ビルド。
+- インストール: `REPLAY_SIGNING_IDENTITY="Developer ID Application: Hiroaki Endo (D7ZSUP4RL5)" ./scripts/build_app.sh` のあと、`/Applications/Replay.app` を消してから `ditto dist/Replay.app /Applications/Replay.app`。コピーの前に、アプリが起動していないことを確かめる（終了はユーザーに頼む）。
+  - **アドホック署名（`build_app.sh` をそのまま実行したもの）は入れない。** ビルドのたびに署名のハッシュが変わり、macOS が保存した許可（Chrome の Cookie を読むための「他のアプリのデータ」= `kTCCServiceSystemPolicyAppDataDetailed` など）と一致しなくなる。ログには `Failed to match existing code requirement for subject com.mg.replay` と出る。
+  - テスト用に画面を確かめるときは、Bundle ID を変えたコピー（例: `com.mg.replay.layouttest`）を、`HOME` と `CFFIXED_USER_HOME` をスクラッチ用のフォルダに向けて起動する。実データには触れない。
 - ツールを同梱した自己完結のアプリ: `./scripts/package_release.sh`（署名の環境変数がなければアドホック署名）。
 - テスト: `./scripts/test.sh`。XCTest ではなく、`tools/*_check.swift` を `swiftc` でコンパイルして実行する方式。新しいテストを足すときは `scripts/test.sh` にも追記する。
 - CI（`.github/workflows/ci.yml`）は `macos-26` でビルドとテストを実行する。手元は macOS 27 なので、OS の挙動の違いに注意する。

@@ -135,6 +135,9 @@ final class DownloadEngine {
                     "--part",
                     "--newline",
                     "--no-color",
+                    // `--print` implies `--quiet`, which suppresses every
+                    // progress line, including `--progress-template` output.
+                    "--progress",
                     "--paths", destination.path,
                     "--output", "\(itemID.uuidString).%(ext)s",
                     "--format", Self.downloadFormat,
@@ -147,8 +150,8 @@ final class DownloadEngine {
                     "--sub-format", "vtt/best",
                     "--convert-subs", "srt",
                     "--ffmpeg-location", ffmpeg.deletingLastPathComponent().path,
-                    "--progress-template", "download:WL_PROGRESS\t%(progress._percent_str)s\t%(progress._speed_str)s\t%(progress._eta_str)s",
-                    "--print", "before_dl:WL_META\t%(title)j\t%(uploader)j\t%(duration)j\t%(chapters)j\t%(description)j",
+                    "--progress-template", "download:WL_PROGRESS\t%(progress._percent_str)s\t%(progress._speed_str)s\t%(progress._eta_str)s\t%(info.format_id)s",
+                    "--print", "before_dl:WL_META\t%(title)j\t%(uploader)j\t%(duration)j\t%(chapters)j\t%(description)j\t%(format_id)j\t%(requested_formats.:.filesize)j\t%(requested_formats.:.filesize_approx)j\t%(width)j\t%(height)j\t%(fps)j\t%(vcodec)j",
                     "--print", "after_move:WL_DONE\t%(filepath)j\t%(title)j\t%(uploader)j\t%(duration)j\t%(chapters)j\t%(description)j"
                 ]
                 if let deno = self.findTool(named: "deno") {
@@ -180,6 +183,7 @@ final class DownloadEngine {
                 let fallbackDescription = self.postDescriptionFallback(for: sourceURL)
                 var finishedFile: URL?
                 var announcedSubtitleURL: URL?
+                var progressTracker = DownloadProgressTracker()
 
                 while true {
                     let data = output.fileHandleForReading.availableData
@@ -194,6 +198,7 @@ final class DownloadEngine {
                             fallbackDescription: fallbackDescription,
                             metadata: &latestMetadata,
                             finishedFile: &finishedFile,
+                            progressTracker: &progressTracker,
                             recentLines: &recentLines,
                             onEvent: onEvent
                         )
@@ -211,6 +216,7 @@ final class DownloadEngine {
                         fallbackDescription: fallbackDescription,
                         metadata: &latestMetadata,
                         finishedFile: &finishedFile,
+                        progressTracker: &progressTracker,
                         recentLines: &recentLines,
                         onEvent: onEvent
                     )
@@ -345,6 +351,7 @@ final class DownloadEngine {
                 )
                 let fallbackDescription = self.postDescriptionFallback(for: sourceURL)
                 var finishedFile: URL?
+                var progressTracker = DownloadProgressTracker()
                 var recentLines: [String] = []
                 for line in String(decoding: data, as: UTF8.self).components(separatedBy: .newlines) {
                     self.parse(
@@ -352,6 +359,7 @@ final class DownloadEngine {
                         fallbackDescription: fallbackDescription,
                         metadata: &metadata,
                         finishedFile: &finishedFile,
+                        progressTracker: &progressTracker,
                         recentLines: &recentLines,
                         onEvent: { _ in }
                     )
@@ -616,20 +624,13 @@ final class DownloadEngine {
         fallbackDescription: () -> String?,
         metadata: inout Metadata,
         finishedFile: inout URL?,
+        progressTracker: inout DownloadProgressTracker,
         recentLines: inout [String],
         onEvent: (Event) -> Void
     ) {
-        if line.hasPrefix("WL_PROGRESS\t") {
-            let fields = line.components(separatedBy: "\t")
-            let rawPercent = fields.count > 1 ? fields[1] : ""
-            let numeric = rawPercent.replacingOccurrences(of: "%", with: "")
-                .trimmingCharacters(in: .whitespaces)
-            let fraction = min(max((Double(numeric) ?? 0) / 100, 0), 1)
-            let speed = fields.count > 2 ? fields[2].trimmingCharacters(in: .whitespaces) : ""
-            let eta = fields.count > 3 ? fields[3].trimmingCharacters(in: .whitespaces) : ""
-            let label = [rawPercent.trimmingCharacters(in: .whitespaces), speed, eta.isEmpty ? "" : "ETA \(eta)"]
-                .filter { !$0.isEmpty }
-                .joined(separator: " · ")
+        if let progress = DownloadProgressLine.parse(line) {
+            guard let fraction = progressTracker.update(with: progress) else { return }
+            let label = progressTracker.label(fraction: fraction, speed: progress.speed, eta: progress.eta)
             onEvent(.progress(fraction, label))
             return
         }
@@ -637,6 +638,25 @@ final class DownloadEngine {
         if line.hasPrefix("WL_META\t") || line.hasPrefix("WL_DONE\t") {
             let fields = line.components(separatedBy: "\t")
             let offset = line.hasPrefix("WL_DONE\t") ? 2 : 1
+            if line.hasPrefix("WL_META\t"), fields.count > 6 {
+                let formatID: String? = decodeJSON(fields[6])
+                let exactSizes = fields.count > 7 ? byteSizes(fields[7]) : []
+                let approximateSizes = fields.count > 8 ? byteSizes(fields[8]) : []
+                let sizes = exactSizes.indices.map { index in
+                    exactSizes[index] ?? (index < approximateSizes.count ? approximateSizes[index] : nil)
+                }
+                let quality = VideoQuality.label(
+                    width: fields.count > 9 ? decodeJSON(fields[9]) : nil,
+                    height: fields.count > 10 ? decodeJSON(fields[10]) : nil,
+                    frameRate: fields.count > 11 ? decodeJSON(fields[11]) : nil,
+                    codec: fields.count > 12 ? decodeJSON(fields[12]) : nil
+                )
+                progressTracker.begin(
+                    formatID: formatID,
+                    sizes: sizes.isEmpty ? approximateSizes : sizes,
+                    quality: quality
+                )
+            }
             if line.hasPrefix("WL_DONE\t"), fields.count > 1,
                let path: String = decodeJSON(fields[1]), !path.isEmpty {
                 finishedFile = URL(fileURLWithPath: path)
@@ -678,6 +698,12 @@ final class DownloadEngine {
             text = ChapterMetadata.publicPostText(from: data)
             return text
         }
+    }
+
+    /// Decodes a JSON list of byte sizes such as `[223779, null]`.
+    private func byteSizes(_ value: String) -> [Double?] {
+        guard let list: [Any] = decodeJSON(value) else { return [] }
+        return list.map { ($0 as? NSNumber)?.doubleValue }
     }
 
     private func decodeJSON<T>(_ value: String) -> T? {

@@ -63,8 +63,8 @@ if [[ -n "$output" ]]; then
     $subtitle && printf '1\n00:00:00,000 --> 00:00:01,000\nFixture\n' > "$paths/$prefix.en.srt"
     if ! $skip_download; then
         : > "$paths/$prefix.mp4"
-        printf 'WL_META\t"Offline fixture"\t"Replay test"\t12\t[]\t\"0:00 Intro\\n0:05 Main topic\"\n'
-        printf 'WL_PROGRESS\t50%%\t1KiB/s\t00:01\n'
+        printf 'WL_META\t"Offline fixture"\t"Replay test"\t12\t[]\t\"0:00 Intro\\n0:05 Main topic\"\t"18"\tnull\tnull\t640\t360\t30\t"avc1.42001E"\n'
+        printf 'WL_PROGRESS\t50%%\t1KiB/s\t00:01\t18\n'
         printf 'WL_DONE\t"%s"\t"Offline fixture"\t"Replay test"\t12\t[]\t\"0:00 Intro\\n0:05 Main topic\"\n' "$paths/$prefix.mp4"
     fi
 else
@@ -85,6 +85,8 @@ swiftc -module-cache-path "$scratch_dir/module-cache" \
     "$project_dir/Sources/Replay/URLIntake.swift" \
     "$project_dir/Sources/Replay/YouTubePreview.swift" \
     "$project_dir/Sources/Replay/DownloadAuthentication.swift" \
+    "$project_dir/Sources/Replay/DownloadProgress.swift" \
+    "$project_dir/Sources/Replay/VideoQuality.swift" \
     "$project_dir/Sources/Replay/DownloadEngine.swift" \
     "$project_dir/tools/browser_auth_engine_check.swift" \
     -o "$app_dir/Contents/MacOS/BrowserAuthEngineCheck"

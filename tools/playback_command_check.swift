@@ -180,6 +180,21 @@ struct PlaybackCommandCheck {
             isAlreadyActive: false,
             isExternalPlaybackActive: false
         ))
+        // Audio-only background playback never opens the mini player.
+        precondition(!PictureInPicturePolicy.shouldStart(
+            isAppActive: false,
+            isPlaying: true,
+            reachedEnd: false,
+            isAlreadyActive: false,
+            isExternalPlaybackActive: false,
+            backgroundMode: .audioOnly
+        ))
+        let backgroundDefaults = UserDefaults(suiteName: "replay.background-mode-check.\(UUID().uuidString)")!
+        precondition(BackgroundPlaybackMode.load(from: backgroundDefaults) == .miniPlayer)
+        backgroundDefaults.set(BackgroundPlaybackMode.audioOnly.rawValue, forKey: BackgroundPlaybackMode.defaultsKey)
+        precondition(BackgroundPlaybackMode.load(from: backgroundDefaults) == .audioOnly)
+        backgroundDefaults.set("unknown", forKey: BackgroundPlaybackMode.defaultsKey)
+        precondition(BackgroundPlaybackMode.load(from: backgroundDefaults) == .miniPlayer)
         precondition(!PictureInPicturePolicy.shouldStart(
             isAppActive: false,
             isPlaying: false,

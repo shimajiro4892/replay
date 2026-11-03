@@ -123,7 +123,7 @@ struct ContentView: View {
                     // content-safe-area origin, about 56 points to the right of
                     // this full-width sidebar marker. Compensate here so the
                     // visible button uses the sidebar coordinates above.
-                    let titlebarHostOffset: CGFloat = 56
+                    let titlebarHostOffset = TitlebarLayout.sidebarHostOffset
 
                     if columnVisibility != .detailOnly {
                         TitlebarInteractiveHost {
@@ -228,6 +228,7 @@ struct ContentView: View {
                         .padding(.horizontal, 9)
                         .padding(.top, 8)
                         .padding(.bottom, 12)
+                        .background(ScrollViewAutomaticInsetDisabler())
                     }
                     .frame(width: listGeometry.size.width, height: listGeometry.size.height, alignment: .topLeading)
                     .scrollIndicators(.hidden)
@@ -809,12 +810,18 @@ private struct VideoDetail: View {
     @State private var volumeHUDVisible = false
     @State private var volumeHUDDismissalTask: Task<Void, Never>?
     @State private var isBrowserAuthenticationPresented = false
+    @State private var videoQuality: String?
     let item: WatchItem
     let sidebarCollapsed: Bool
 
     var body: some View {
         detailBody
             .navigationTitle("")
+            .task(id: item.state == .ready ? item.localFilePath : nil) {
+                videoQuality = nil
+                guard item.state == .ready, let fileURL = item.localFileURL else { return }
+                videoQuality = await VideoQuality.probe(fileURL: fileURL)
+            }
             .sheet(isPresented: $isBrowserAuthenticationPresented) {
                 BrowserAuthenticationView(browser: store.authenticationBrowser, retryItemID: item.id)
                     .environmentObject(store)
@@ -891,8 +898,11 @@ private struct VideoDetail: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
 
-                if !item.author.isEmpty {
-                    Text(item.author)
+                let subtitle = [item.author, videoQuality ?? ""]
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " · ")
+                if !subtitle.isEmpty {
+                    Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -918,7 +928,7 @@ private struct VideoDetail: View {
                 .fixedSize()
             }
         }
-        .padding(.leading, sidebarCollapsed ? 154 : 14)
+        .padding(.leading, sidebarCollapsed ? 154 : TitlebarLayout.detailHeaderLeadingInset)
         .padding(.trailing, 14)
         .frame(height: 56)
     }
@@ -2111,5 +2121,29 @@ private struct EmptyLibraryView: View {
             .watchGlass(.clear, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
         .onDrop(of: [UTType.url, UTType.fileURL, UTType.plainText], isTargeted: $isDropTarget, perform: receiveProviders)
+    }
+}
+
+/// Title-bar geometry that depends on where AppKit places
+/// NavigationSplitView's native sidebar toggle.
+enum TitlebarLayout {
+    /// macOS 27 moved the sidebar toggle from the sidebar's trailing edge to
+    /// the leading edge of the detail column (about 9–43 points in), where it
+    /// covered the start of the video title.
+    static var sidebarToggleSitsInDetail: Bool {
+        if #available(macOS 27, *) { return true }
+        return false
+    }
+
+    /// Leading inset of the detail header while the sidebar is visible.
+    static var detailHeaderLeadingInset: CGFloat {
+        sidebarToggleSitsInDetail ? 54 : 14
+    }
+
+    /// Distance between the sidebar's own origin and the origin AppKit uses
+    /// for the detached title-bar host. Without the toggle in the sidebar,
+    /// macOS 27 lays the host out about 38 points further left; 33 of those are taken back here to leave a 10-point gap after the window controls.
+    static var sidebarHostOffset: CGFloat {
+        sidebarToggleSitsInDetail ? 89 : 56
     }
 }

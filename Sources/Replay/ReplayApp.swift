@@ -38,6 +38,7 @@ private struct ReplayCommands: Commands {
     @ObservedObject var updater: AppUpdater
     @ObservedObject var store: QueueStore
     @Binding var isBrowserAuthenticationPresented: Bool
+    @AppStorage(BackgroundPlaybackMode.defaultsKey) private var backgroundPlaybackMode = BackgroundPlaybackMode.miniPlayer.rawValue
 
     var body: some Commands {
         CommandGroup(after: .appInfo) {
@@ -45,6 +46,13 @@ private struct ReplayCommands: Commands {
                 updater.performMenuAction()
             }
             .disabled(!updater.menuItemIsEnabled)
+
+            Divider()
+            Picker("When in Background", selection: $backgroundPlaybackMode) {
+                ForEach(BackgroundPlaybackMode.allCases, id: \.rawValue) { mode in
+                    Text(mode.menuTitle).tag(mode.rawValue)
+                }
+            }
 
             Divider()
             Button("YouTube Sign-In…") { isBrowserAuthenticationPresented = true }

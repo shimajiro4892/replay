@@ -620,15 +620,39 @@ enum PlaybackVolumePreference {
     }
 }
 
+/// What happens to a playing video when Replay moves to the background.
+enum BackgroundPlaybackMode: String, CaseIterable {
+    /// Move the video into the floating mini player.
+    case miniPlayer
+    /// Keep playing in the main window without opening the mini player, so
+    /// only the audio follows the user to other apps.
+    case audioOnly
+
+    static let defaultsKey = "backgroundPlaybackMode"
+
+    static func load(from defaults: UserDefaults = .standard) -> BackgroundPlaybackMode {
+        defaults.string(forKey: defaultsKey).flatMap(BackgroundPlaybackMode.init(rawValue:)) ?? .miniPlayer
+    }
+
+    var menuTitle: String {
+        switch self {
+        case .miniPlayer: return "Show Mini Player"
+        case .audioOnly: return "Keep Playing Audio Only"
+        }
+    }
+}
+
 enum PictureInPicturePolicy {
     static func shouldStart(
         isAppActive: Bool,
         isPlaying: Bool,
         reachedEnd: Bool,
         isAlreadyActive: Bool,
-        isExternalPlaybackActive: Bool
+        isExternalPlaybackActive: Bool,
+        backgroundMode: BackgroundPlaybackMode = .miniPlayer
     ) -> Bool {
-        !isAppActive
+        backgroundMode == .miniPlayer
+            && !isAppActive
             && isPlaying
             && !reachedEnd
             && !isAlreadyActive
@@ -1705,7 +1729,8 @@ struct LocalVideoPlayer: NSViewRepresentable {
                     isPlaying: player.timeControlStatus != .paused,
                     reachedEnd: reachedEnd,
                     isAlreadyActive: backgroundPanel != nil,
-                    isExternalPlaybackActive: player.isExternalPlaybackActive
+                    isExternalPlaybackActive: player.isExternalPlaybackActive,
+                    backgroundMode: BackgroundPlaybackMode.load()
                   ) else { return }
 
             let floatingView = FloatingVideoPlayerView()
