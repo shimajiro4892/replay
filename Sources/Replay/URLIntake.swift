@@ -57,11 +57,14 @@ enum URLIntake {
             return []
         }
 
+        let text = rawValue as NSString
         var matches: [(location: Int, url: URL)] = []
         detector.enumerateMatches(in: rawValue, options: [], range: fullRange) { result, _, _ in
             guard let result,
-                  let url = result.url,
-                  isWebURL(url) else { return }
+                  let detectedURL = result.url,
+                  isWebURL(detectedURL) else { return }
+            let matchedText = text.substring(with: result.range)
+            let url = hasExplicitScheme(matchedText) ? detectedURL : withHTTPSScheme(detectedURL)
             matches.append((result.range.location, url))
         }
 
@@ -119,6 +122,21 @@ enum URLIntake {
               ["shorts", "embed", "live"].contains(pathParts[0]),
               !pathParts[1].isEmpty else { return nil }
         return pathParts[1]
+    }
+
+    /// NSDataDetector fills in a scheme for bare links such as
+    /// `www.example.com`, but the scheme it picks differs between macOS
+    /// releases (`http` on macOS 26, `https` on macOS 27). Bare links are
+    /// normalized to HTTPS so extraction is the same on every system.
+    private static func hasExplicitScheme(_ text: String) -> Bool {
+        let lowercased = text.lowercased()
+        return lowercased.hasPrefix("http://") || lowercased.hasPrefix("https://")
+    }
+
+    private static func withHTTPSScheme(_ url: URL) -> URL {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        components.scheme = "https"
+        return components.url ?? url
     }
 
     private static func isWebURL(_ url: URL) -> Bool {

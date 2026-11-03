@@ -16,13 +16,14 @@ struct URLIntakeCheck {
         precondition(extracted == [
             "https://www.youtube.com/watch?v=abc123",
             "https://x.com/example/status/987654321",
-            "http://www.example.com/watch/list"
+            "https://www.example.com/watch/list"
         ], "Unexpected extraction: \(extracted)")
 
         let markdown = "[One](https://example.com/one), [Two](https://example.com/two)."
         let markdownLinks = URLIntake.webURLs(from: markdown).map(\.absoluteString)
         precondition(markdownLinks == ["https://example.com/one", "https://example.com/two"])
 
+        precondition(URLIntake.webURL(from: "Plain http://example.com/insecure link")?.absoluteString == "http://example.com/insecure")
         precondition(URLIntake.webURLs(from: "No links in this paragraph.").isEmpty)
         precondition(URLIntake.webURL(from: "https://example.com/single")?.absoluteString == "https://example.com/single")
         precondition(
