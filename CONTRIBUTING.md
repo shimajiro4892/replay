@@ -7,7 +7,7 @@ Thanks for helping improve Replay.
 Replay requires macOS 13 or newer and Swift 5.9 or newer.
 
 ```sh
-git clone https://github.com/grinich/replay.git
+git clone https://github.com/shimajiro4892/replay.git
 cd replay
 ./scripts/build_app.sh
 ./scripts/test.sh

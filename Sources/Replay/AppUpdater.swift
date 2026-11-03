@@ -35,7 +35,7 @@ final class AppUpdater: ObservableObject {
 
             return Configuration(
                 releaseAPIURL: URL(string: environment["REPLAY_UPDATE_RELEASE_API_URL"]
-                    ?? "https://api.github.com/repos/grinich/replay/releases/latest")!,
+                    ?? "https://api.github.com/repos/shimajiro4892/replay/releases/latest")!,
                 updatesDirectory: URL(fileURLWithPath: environment["REPLAY_UPDATE_ROOT"]
                     ?? applicationSupport
                         .appendingPathComponent("Replay", isDirectory: true)

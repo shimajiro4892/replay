@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/grinich/replay/releases/latest/download/Replay.dmg"><strong>Download Replay for macOS</strong></a>
+  <a href="https://github.com/shimajiro4892/replay/releases/latest/download/Replay.dmg"><strong>Download Replay for macOS</strong></a>
   ·
-  <a href="https://github.com/grinich/replay/releases">All releases</a>
+  <a href="https://github.com/shimajiro4892/replay/releases">All releases</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/grinich/replay/actions/workflows/ci.yml"><img src="https://github.com/grinich/replay/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/grinich/replay/releases/latest"><img src="https://img.shields.io/github/v/release/grinich/replay" alt="Latest release"></a>
+  <a href="https://github.com/shimajiro4892/replay/actions/workflows/ci.yml"><img src="https://github.com/shimajiro4892/replay/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/shimajiro4892/replay/releases/latest"><img src="https://img.shields.io/github/v/release/shimajiro4892/replay" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
 </p>
 
@@ -30,7 +30,7 @@
 
 ## Install
 
-1. [Download the latest DMG](https://github.com/grinich/replay/releases/latest/download/Replay.dmg).
+1. [Download the latest DMG](https://github.com/shimajiro4892/replay/releases/latest/download/Replay.dmg).
 2. Open it and drag **Replay** into **Applications**.
 3. Open Replay normally from Applications.
 
@@ -95,7 +95,7 @@ Use Replay only for media you are authorized to download. Site terms and copyrig
 ## Build from source
 
 ```sh
-git clone https://github.com/grinich/replay.git
+git clone https://github.com/shimajiro4892/replay.git
 cd replay
 ./scripts/build_app.sh
 ./scripts/test.sh
