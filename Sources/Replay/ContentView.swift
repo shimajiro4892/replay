@@ -523,7 +523,12 @@ private struct QueueRow: View, Equatable {
             }
         }
         .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .onTapGesture(perform: select)
+        // The title's double-click-to-rename gesture would otherwise make a
+        // plain `onTapGesture` here wait out the system double-click interval
+        // (up to several hundred milliseconds, or longer when the user has
+        // slowed it down) before selecting. Recognize the single click
+        // simultaneously so selection happens on the first mouse-up.
+        .simultaneousGesture(TapGesture().onEnded(select))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction(.default, select)
