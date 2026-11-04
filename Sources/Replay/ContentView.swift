@@ -11,6 +11,12 @@ struct ContentView: View {
     @State private var detailSelection: UUID?
     @State private var knownItemIDs: Set<UUID> = []
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var windowWidth: CGFloat = 0
+    @State private var sidebarWidth: CGFloat = 292
+    /// True while the sidebar is hidden because the window got too narrow,
+    /// so widening the window brings it back. Hiding or showing it by hand
+    /// clears this.
+    @State private var isSidebarAutoCollapsed = false
     @State private var queueRowFrames: [UUID: CGRect] = [:]
     @State private var isAddVideoPresented = false
     @State private var addVideoURLText = ""
@@ -25,15 +31,32 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
                 .navigationSplitViewColumnWidth(min: 248, ideal: 292, max: 340)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear
+                            .onAppear { recordSidebarWidth(geometry.size.width) }
+                            .onChange(of: geometry.size.width) { recordSidebarWidth($0) }
+                    }
+                }
         } detail: {
             detail
         }
         .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 900, minHeight: 420)
+        .frame(minWidth: 640, minHeight: 420)
         .coordinateSpace(name: "replay-window")
         .background {
             WindowStyleConfigurator(title: store.selectedItem?.title ?? "Replay")
                 .frame(width: 0, height: 0)
+        }
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear { adaptSidebar(toWindowWidth: geometry.size.width) }
+                    .onChange(of: geometry.size.width) { adaptSidebar(toWindowWidth: $0) }
+            }
+        }
+        .onChange(of: columnVisibility) { visibility in
+            if visibility != .detailOnly { isSidebarAutoCollapsed = false }
         }
         .overlay(alignment: .top) {
             if let notice = store.intakeNotice {
@@ -86,6 +109,43 @@ struct ContentView: View {
                 itemToDelete = nil
             }
             Button("Cancel", role: .cancel) { itemToDelete = nil }
+        }
+    }
+
+    /// Narrowest the video column gets before the sidebar steps aside.
+    private static let sidebarAutoCollapseDetailWidth: CGFloat = 600
+    /// Extra width needed before an auto-hidden sidebar comes back, so a
+    /// window resized right at the threshold does not flicker.
+    private static let sidebarAutoRestoreMargin: CGFloat = 24
+
+    private func recordSidebarWidth(_ width: CGFloat) {
+        // Ignore the column while it is hidden or sliding away.
+        guard columnVisibility != .detailOnly, width >= 200 else { return }
+        sidebarWidth = width
+    }
+
+    /// Hides the sidebar when the window shrinks past the point where the
+    /// video column would drop below `sidebarAutoCollapseDetailWidth`, and
+    /// brings it back once there is room again. Only crossing the threshold
+    /// acts, so a sidebar opened by hand in a narrow window stays open.
+    private func adaptSidebar(toWindowWidth newWidth: CGFloat) {
+        let previousWidth = windowWidth
+        windowWidth = newWidth
+        guard newWidth > 0 else { return }
+
+        let threshold = Self.sidebarAutoCollapseDetailWidth
+        let detailWidth = newWidth - sidebarWidth
+        let previousDetailWidth = previousWidth - sidebarWidth
+
+        if columnVisibility != .detailOnly {
+            let crossedBelow = previousWidth == 0 || previousDetailWidth >= threshold
+            if detailWidth < threshold, crossedBelow {
+                withAnimation(.easeInOut(duration: 0.2)) { columnVisibility = .detailOnly }
+                isSidebarAutoCollapsed = true
+            }
+        } else if isSidebarAutoCollapsed, detailWidth >= threshold + Self.sidebarAutoRestoreMargin {
+            withAnimation(.easeInOut(duration: 0.2)) { columnVisibility = .all }
+            isSidebarAutoCollapsed = false
         }
     }
 
@@ -816,6 +876,7 @@ private struct VideoDetail: View {
     @State private var volumeHUDDismissalTask: Task<Void, Never>?
     @State private var isBrowserAuthenticationPresented = false
     @State private var videoQuality: String?
+    @State private var headerWidth: CGFloat = .infinity
     let item: WatchItem
     let sidebarCollapsed: Bool
 
@@ -854,8 +915,12 @@ private struct VideoDetail: View {
             .onChange(of: item.subtitleFilePath) { _ in loadSubtitles() }
     }
 
+    /// Below this header width the labeled buttons (about 270 points) would
+    /// leave the video title too little room, so they shrink to icons.
+    private static let labeledToolbarActionsMinHeaderWidth: CGFloat = 600
+
     private var usesCompactToolbarActions: Bool {
-        !item.availableChapters.isEmpty
+        !item.availableChapters.isEmpty || headerWidth < Self.labeledToolbarActionsMinHeaderWidth
     }
 
     private var playbackSource: VideoPlaybackSource? {
@@ -936,6 +1001,13 @@ private struct VideoDetail: View {
         .padding(.leading, sidebarCollapsed ? 154 : TitlebarLayout.detailHeaderLeadingInset)
         .padding(.trailing, 14)
         .frame(height: 56)
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear { headerWidth = geometry.size.width }
+                    .onChange(of: geometry.size.width) { headerWidth = $0 }
+            }
+        }
     }
 
     private var videoActionButtons: some View {
